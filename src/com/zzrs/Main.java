@@ -32,6 +32,12 @@ class MeterData {
 }
 
 public class Main {
+    public static final String USERNAME = "user";
+    public static final String PASSWORD = "password";
+
+    public static final int SERVER_PORT = 8080;
+
+
     private static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static Connection sqlConnection = null;
 
@@ -41,16 +47,20 @@ public class Main {
     public static void main(String[] args)  {
 
         try {
-            Class.forName("com.mysql.jdbc.Driver");
-            sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost:3306/zzrs?profileSQL=true","myLogin","myPassword");
+            Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
+            sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user="+USERNAME+"&password="+PASSWORD);
 
-            HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+            HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
             server.createContext("/report", new ZZRSHandler());
             server.setExecutor(null);
             server.start();
         } catch (IOException | SQLException exception) {
             exception.printStackTrace();
         } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (InstantiationException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }
