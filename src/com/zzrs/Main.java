@@ -47,14 +47,17 @@ public class Main {
     public static void main(String[] args)  {
 
         try {
-            Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
-            sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user="+USERNAME+"&password="+PASSWORD);
+            // Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
+            // sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user="+USERNAME+"&password="+PASSWORD);
 
             HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
             server.createContext("/report", new ZZRSHandler());
             server.setExecutor(null);
             server.start();
-        } catch (IOException | SQLException exception) {
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+         /*catch (IOException | SQLException exception) {
             exception.printStackTrace();
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
@@ -62,41 +65,41 @@ public class Main {
             throw new RuntimeException(e);
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
-        }
+        }*/
     }
 
 
-    private static void handleMeterData(MeterData meterData) {
-        if (databaseQueue.containsKey(meterData.timestep)) {
-            databaseQueue.get(meterData.timestep).add(meterData);
-        } else if (!timestepsSaved.contains(meterData.timestep)) {
-            var list = new ArrayList<MeterData>();
-            list.add(meterData);
-            databaseQueue.put(meterData.timestep, list);
+    // private static void handleMeterData(MeterData meterData) {
+    //     if (databaseQueue.containsKey(meterData.timestep)) {
+    //         databaseQueue.get(meterData.timestep).add(meterData);
+    //     } else if (!timestepsSaved.contains(meterData.timestep)) {
+    //         var list = new ArrayList<MeterData>();
+    //         list.add(meterData);
+    //         databaseQueue.put(meterData.timestep, list);
 
-            executorService.schedule(() -> {
-                saveTimestepToDatabase(meterData.timestep);
-            }, 3, TimeUnit.SECONDS);
-        }
-    }
+    //         executorService.schedule(() -> {
+    //             saveTimestepToDatabase(meterData.timestep);
+    //         }, 3, TimeUnit.SECONDS);
+    //     }
+    // }
 
-    private static void saveTimestepToDatabase(int timestep) {
-        try {
-            PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, timestep, value) VALUES (?, ?, ?)");
+    // private static void saveTimestepToDatabase(int timestep) {
+    //     try {
+    //         PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, timestep, value) VALUES (?, ?, ?)");
 
-            var list = databaseQueue.get(timestep);
-            for (MeterData meterData : list) {
-                statement.setInt(1, meterData.id);
-                statement.setInt(2, meterData.timestep);
-                statement.setInt(3, meterData.value);
-                statement.addBatch();
-            }
+    //         var list = databaseQueue.get(timestep);
+    //         for (MeterData meterData : list) {
+    //             statement.setInt(1, meterData.id);
+    //             statement.setInt(2, meterData.timestep);
+    //             statement.setInt(3, meterData.value);
+    //             statement.addBatch();
+    //         }
 
-            statement.executeBatch();
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-        }
-    }
+    //         statement.executeBatch();
+    //     } catch (SQLException exception) {
+    //         exception.printStackTrace();
+    //     }
+    // }
 
     static class ZZRSHandler implements HttpHandler {
         private Map<String, Integer> parseBody(String rawBody) {
@@ -135,7 +138,10 @@ public class Main {
 
             var body = this.parseBody(rawData);
 
-            handleMeterData(new MeterData(body.get("id"), body.get("timestep"), body.get("value")));
+            MeterData meterData = new MeterData(body.get("id"), body.get("timestep"), body.get("value"));
+            System.out.println("[RECIEVED] meter_id:" + meterData.id + "; timestep: " + meterData.timestep + "; value: " + meterData.value);
+
+            // handleMeterData(meterData);
         }
     }
 }
