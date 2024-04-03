@@ -5,7 +5,6 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -17,16 +16,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 class MeterData {
     long id;
-    long timestep;
+    long timestamp;
     long value;
 
     public MeterData(long id, long timestep, long value) {
         this.id = id;
-        this.timestep = timestep;
+        this.timestamp = timestep;
         this.value = value;
     }
 }
@@ -108,7 +106,15 @@ public class Main {
             var params = rawBody.split("&");
             for (var param : params) {
                 var pair = param.split("=");
-                toReturn.put(pair[0], Long.valueOf(pair[1]));
+                long value = 0L;
+
+                try {
+                    value = Long.parseLong(pair[1]);
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                }
+
+                toReturn.put(pair[0], value);
             }
 
             return toReturn;
@@ -130,7 +136,6 @@ public class Main {
                 isr.close();
 
                 String rawData = buf.toString();
-                System.out.println("Got a request with raw body: " + rawData);
 
                 String response = "OK";
                 t.sendResponseHeaders(200, response.length());
@@ -140,10 +145,11 @@ public class Main {
 
                 var body = this.parseBody(rawData);
 
-                MeterData meterData = new MeterData(body.get("id"), body.get("timestep"), body.get("value"));
-                System.out.println("[RECIEVED] meter_id:" + meterData.id + "; timestep: " + meterData.timestep + "; value: " + meterData.value);
-
-                // handleMeterData(meterData);
+                if (body.containsKey("id") && body.containsKey("timestamp") && body.containsKey("value")) {
+                    MeterData meterData = new MeterData(body.get("id"), body.get("timestamp"), body.get("value"));
+                    System.out.println("[RECIEVED] meter_id:" + meterData.id + "; timestamp: " + meterData.timestamp + "; value: " + meterData.value);
+                    // handleMeterData(meterData);
+                }
             } catch(Exception exception) {
                 exception.printStackTrace();
             }
