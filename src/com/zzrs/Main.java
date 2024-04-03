@@ -20,11 +20,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 class MeterData {
-    int id;
-    int timestep;
-    int value;
+    long id;
+    long timestep;
+    long value;
 
-    public MeterData(int id, int timestep, int value) {
+    public MeterData(long id, long timestep, long value) {
         this.id = id;
         this.timestep = timestep;
         this.value = value;
@@ -102,46 +102,51 @@ public class Main {
     // }
 
     static class ZZRSHandler implements HttpHandler {
-        private Map<String, Integer> parseBody(String rawBody) {
-            Map<String, Integer> toReturn = new HashMap<String, Integer>();
+        private Map<String, Long> parseBody(String rawBody) {
+            Map<String, Long> toReturn = new HashMap<String, Long>();
 
             var params = rawBody.split("&");
             for (var param : params) {
                 var pair = param.split("=");
-                toReturn.put(pair[0], Integer.valueOf(pair[1]));
+                toReturn.put(pair[0], Long.valueOf(pair[1]));
             }
 
             return toReturn;
         }
 
         @Override
-        public void handle(HttpExchange t) throws IOException {
-            InputStreamReader isr =  new InputStreamReader(t.getRequestBody(), StandardCharsets.UTF_8);
-            BufferedReader br = new BufferedReader(isr);
+        public void handle(HttpExchange t) {
+            try {
+                InputStreamReader isr =  new InputStreamReader(t.getRequestBody(), StandardCharsets.UTF_8);
+                BufferedReader br = new BufferedReader(isr);
 
-            int b;
-            StringBuilder buf = new StringBuilder(512);
-            while ((b = br.read()) != -1) {
-                buf.append((char) b);
+                int b;
+                StringBuilder buf = new StringBuilder(512);
+                while ((b = br.read()) != -1) {
+                    buf.append((char) b);
+                }
+
+                br.close();
+                isr.close();
+
+                String rawData = buf.toString();
+                System.out.println("Got a request with raw body: " + rawData);
+
+                String response = "OK";
+                t.sendResponseHeaders(200, response.length());
+                OutputStream os = t.getResponseBody();
+                os.write(response.getBytes());
+                os.close();
+
+                var body = this.parseBody(rawData);
+
+                MeterData meterData = new MeterData(body.get("id"), body.get("timestep"), body.get("value"));
+                System.out.println("[RECIEVED] meter_id:" + meterData.id + "; timestep: " + meterData.timestep + "; value: " + meterData.value);
+
+                // handleMeterData(meterData);
+            } catch(Exception exception) {
+                exception.printStackTrace();
             }
-
-            br.close();
-            isr.close();
-
-            String rawData = buf.toString();
-
-            String response = "OK";
-            t.sendResponseHeaders(200, response.length());
-            OutputStream os = t.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-
-            var body = this.parseBody(rawData);
-
-            MeterData meterData = new MeterData(body.get("id"), body.get("timestep"), body.get("value"));
-            System.out.println("[RECIEVED] meter_id:" + meterData.id + "; timestep: " + meterData.timestep + "; value: " + meterData.value);
-
-            // handleMeterData(meterData);
         }
     }
 }
