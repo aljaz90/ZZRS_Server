@@ -5,99 +5,99 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 class MeterData {
     long id;
-    long timestamp;
+    long count;
     long value;
+    long travelTime;
 
-    public MeterData(long id, long timestep, long value) {
+    public MeterData(long id, long count, long value, long travelTime) {
         this.id = id;
-        this.timestamp = timestep;
+        this.count = count;
         this.value = value;
+        this.travelTime = travelTime;
     }
 }
 
 public class Main {
     public static final String USERNAME = "user";
     public static final String PASSWORD = "password";
-
     public static final int SERVER_PORT = 8080;
-
-
-    private static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static Connection sqlConnection = null;
+    public static List<MeterData> databaseQueue = new ArrayList<>();
 
-    public static Map<Integer, List<MeterData>> databaseQueue = new HashMap<>();
-    public static List<Integer> timestepsSaved = new ArrayList<>();
+    static Calendar midnight = normalizeTimeDown(Calendar.getInstance());
 
     public static void main(String[] args)  {
 
         try {
-            // Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
-            // sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user="+USERNAME+"&password="+PASSWORD);
+            Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
+            sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user="+USERNAME+"&password="+PASSWORD);
+
+            executorService.scheduleAtFixedRate(Main::saveToDatabase, 60, 60, TimeUnit.SECONDS);
 
             HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
             server.createContext("/report", new ZZRSHandler());
             server.setExecutor(null);
             server.start();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException | SQLException | ClassNotFoundException | InstantiationException |
+                 IllegalAccessException exception) {
+            throw new RuntimeException(exception);
         }
-         /*catch (IOException | SQLException exception) {
-            exception.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        } catch (InstantiationException e) {
-            throw new RuntimeException(e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }*/
     }
 
 
-    // private static void handleMeterData(MeterData meterData) {
-    //     if (databaseQueue.containsKey(meterData.timestep)) {
-    //         databaseQueue.get(meterData.timestep).add(meterData);
-    //     } else if (!timestepsSaved.contains(meterData.timestep)) {
-    //         var list = new ArrayList<MeterData>();
-    //         list.add(meterData);
-    //         databaseQueue.put(meterData.timestep, list);
+     private static void handleMeterData(MeterData meterData) {
+         databaseQueue.add(meterData);
+     }
 
-    //         executorService.schedule(() -> {
-    //             saveTimestepToDatabase(meterData.timestep);
-    //         }, 3, TimeUnit.SECONDS);
-    //     }
-    // }
+     private static void saveToDatabase() {
+         try {
+             PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, count, value, travelTime) VALUES (?, ?, ?, ?)");
 
-    // private static void saveTimestepToDatabase(int timestep) {
-    //     try {
-    //         PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, timestep, value) VALUES (?, ?, ?)");
+             int i = 0;
+             while(!databaseQueue.isEmpty()) {
+                 MeterData meterData = databaseQueue.removeFirst();
 
-    //         var list = databaseQueue.get(timestep);
-    //         for (MeterData meterData : list) {
-    //             statement.setInt(1, meterData.id);
-    //             statement.setInt(2, meterData.timestep);
-    //             statement.setInt(3, meterData.value);
-    //             statement.addBatch();
-    //         }
+                 statement.setLong(1, meterData.id);
+                 statement.setLong(2, meterData.count);
+                 statement.setLong(3, meterData.value);
+                 statement.setLong(4, meterData.travelTime);
+                 statement.addBatch();
 
-    //         statement.executeBatch();
-    //     } catch (SQLException exception) {
-    //         exception.printStackTrace();
-    //     }
-    // }
+                 if (i % 1000 == 0) {
+                     statement.executeBatch();
+                 }
+
+                 i++;
+             }
+
+             statement.executeBatch();
+         } catch (SQLException exception) {
+             exception.printStackTrace();
+         }
+     }
+
+    private static Calendar normalizeTimeDown(Calendar calendar) {
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+
+        return calendar;
+    }
 
     static class ZZRSHandler implements HttpHandler {
         private Map<String, Long> parseBody(String rawBody) {
@@ -145,10 +145,14 @@ public class Main {
 
                 var body = this.parseBody(rawData);
 
-                if (body.containsKey("id") && body.containsKey("timestamp") && body.containsKey("value")) {
-                    MeterData meterData = new MeterData(body.get("id"), body.get("timestamp"), body.get("value"));
-                    System.out.println("[RECIEVED] meter_id:" + meterData.id + "; timestamp: " + meterData.timestamp + "; value: " + meterData.value);
-                    // handleMeterData(meterData);
+                if (body.containsKey("id") && body.containsKey("count") && body.containsKey("value") && body.containsKey("timestamp")) {
+                    Calendar calendar = Calendar.getInstance();
+                    long millisecondsFromMidnight =  calendar.getTimeInMillis() - midnight.getTimeInMillis();
+
+                    long travelTime = millisecondsFromMidnight - body.get("timestamp");
+                    MeterData meterData = new MeterData(body.get("id"), body.get("count"), body.get("value"), travelTime);
+                    System.out.println("[RECIEVED] meter_id:" + meterData.id + "; count: " + meterData.count + "; value: " + meterData.value + "; travel time: " + travelTime);
+                    handleMeterData(meterData);
                 }
             } catch(Exception exception) {
                 exception.printStackTrace();
