@@ -167,7 +167,7 @@ public class Main {
                     Calendar calendar = Calendar.getInstance();
                     long millisecondsFromMidnight = calendar.getTimeInMillis() - midnight.getTimeInMillis();
 
-                    long travelTime = millisecondsFromMidnight - clientTimestamp;
+                    long travelTime = Math.abs(millisecondsFromMidnight - clientTimestamp);
                     MeterData meterData = new MeterData(id, count, value, travelTime);
 
                     Timestamp timestamp = new Timestamp(System.currentTimeMillis());
@@ -179,7 +179,7 @@ public class Main {
                             .append(meterData.value).append("; travel time: ")
                             .append(travelTime);
 
-                    System.out.println(stringBuilder);
+//                    System.out.println(stringBuilder);
                     logQueue.append(stringBuilder).append(System.lineSeparator());
 //                    handleMeterData(meterData);
                 }
