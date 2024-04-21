@@ -7,10 +7,8 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.sql.*;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -33,20 +31,21 @@ public class Main {
     public static final String USERNAME = "user";
     public static final String PASSWORD = "password";
     public static final int SERVER_PORT = 8080;
-    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    //    private static Connection sqlConnection = null;
-//    public static List<MeterData> databaseQueue = new ArrayList<>();
+    private static final ScheduledExecutorService logExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService databaseExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private static Connection sqlConnection = null;
+    public static List<MeterData> databaseQueue = new ArrayList<>();
     private static StringBuilder logQueue = new StringBuilder();
 
     static Calendar midnight = normalizeTimeDown(Calendar.getInstance());
 
     public static void main(String[] args) {
-
         try {
-//            Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
-//            sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user="+USERNAME+"&password="+PASSWORD);
+            Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
+            sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user=" + USERNAME + "&password=" + PASSWORD);
 
-            executorService.scheduleAtFixedRate(Main::logToFile, 60, 60, TimeUnit.SECONDS);
+            logExecutorService.scheduleAtFixedRate(Main::logToFile, 60, 60, TimeUnit.SECONDS);
+            databaseExecutorService.scheduleAtFixedRate(Main::saveToDatabase, 60, 60, TimeUnit.SECONDS);
 
             HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
             server.createContext("/report", new ZZRSHandler());
@@ -58,9 +57,9 @@ public class Main {
     }
 
 
-//     private static void handleMeterData(MeterData meterData) {
-//         databaseQueue.add(meterData);
-//     }
+    private static void handleMeterData(MeterData meterData) {
+        databaseQueue.add(meterData);
+    }
 
     private static void logToFile() {
         try {
@@ -84,32 +83,32 @@ public class Main {
         }
     }
 
-//     private static void saveToDatabase() {
-//         try {
-//             PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, count, value, travelTime) VALUES (?, ?, ?, ?)");
-//
-//             int i = 0;
-//             while(!databaseQueue.isEmpty()) {
-//                 MeterData meterData = databaseQueue.removeFirst();
-//
-//                 statement.setLong(1, meterData.id);
-//                 statement.setLong(2, meterData.count);
-//                 statement.setLong(3, meterData.value);
-//                 statement.setLong(4, meterData.travelTime);
-//                 statement.addBatch();
-//
-//                 if (i % 1000 == 0) {
-//                     statement.executeBatch();
-//                 }
-//
-//                 i++;
-//             }
-//
-//             statement.executeBatch();
-//         } catch (SQLException exception) {
-//             exception.printStackTrace();
-//         }
-//     }
+    private static void saveToDatabase() {
+        try {
+            PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, count, value, travelTime) VALUES (?, ?, ?, ?)");
+
+            int i = 0;
+            while (!databaseQueue.isEmpty()) {
+                MeterData meterData = databaseQueue.removeFirst();
+
+                statement.setLong(1, meterData.id);
+                statement.setLong(2, meterData.count);
+                statement.setDouble(3, meterData.value);
+                statement.setLong(4, meterData.travelTime);
+                statement.addBatch();
+
+                if (i % 1000 == 0) {
+                    statement.executeBatch();
+                }
+
+                i++;
+            }
+
+            statement.executeBatch();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+    }
 
     private static Calendar normalizeTimeDown(Calendar calendar) {
         calendar.set(Calendar.HOUR_OF_DAY, 0);
@@ -181,7 +180,7 @@ public class Main {
 
 //                    System.out.println(stringBuilder);
                     logQueue.append(stringBuilder).append(System.lineSeparator());
-//                    handleMeterData(meterData);
+                    handleMeterData(meterData);
                 }
             } catch (Exception exception) {
                 exception.printStackTrace();
