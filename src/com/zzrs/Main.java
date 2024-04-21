@@ -39,13 +39,16 @@ public class Main {
 
     static Calendar midnight = normalizeTimeDown(Calendar.getInstance());
 
+    private static final int writeToDatabaseEvery = 20;
+    private static final int writeToLogEvery = 20;
+
     public static void main(String[] args) {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
             sqlConnection = DriverManager.getConnection("jdbc:mysql://localhost/zzrs?user=" + USERNAME + "&password=" + PASSWORD);
 
-            logExecutorService.scheduleAtFixedRate(Main::logToFile, 60, 60, TimeUnit.SECONDS);
-            databaseExecutorService.scheduleAtFixedRate(Main::saveToDatabase, 60, 60, TimeUnit.SECONDS);
+            logExecutorService.scheduleAtFixedRate(Main::logToFile, writeToLogEvery, writeToLogEvery, TimeUnit.SECONDS);
+            databaseExecutorService.scheduleAtFixedRate(Main::saveToDatabase, writeToDatabaseEvery, writeToDatabaseEvery, TimeUnit.SECONDS);
 
             HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
             server.createContext("/report", new ZZRSHandler());
