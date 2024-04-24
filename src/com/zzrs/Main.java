@@ -28,8 +28,8 @@ class MeterData {
 }
 
 public class Main {
-    public static final String USERNAME = "User123zzrs!";
-    public static final String PASSWORD = "password";
+    public static final String USERNAME = "user";
+    public static final String PASSWORD = "User123zzrs!";
     public static final int SERVER_PORT = 8080;
     private static final ScheduledExecutorService logExecutorService = Executors.newSingleThreadScheduledExecutor();
     private static final ScheduledExecutorService databaseExecutorService = Executors.newSingleThreadScheduledExecutor();
