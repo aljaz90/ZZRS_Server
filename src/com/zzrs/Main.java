@@ -28,7 +28,7 @@ class MeterData {
 }
 
 public class Main {
-    public static final String USERNAME = "user";
+    public static final String USERNAME = "User123zzrs!";
     public static final String PASSWORD = "password";
     public static final int SERVER_PORT = 8080;
     private static final ScheduledExecutorService logExecutorService = Executors.newSingleThreadScheduledExecutor();
@@ -90,9 +90,12 @@ public class Main {
         try {
             PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, count, value, travelTime) VALUES (?, ?, ?, ?)");
 
+            List<MeterData> localDatabaseQueue = databaseQueue;
+            databaseQueue = new ArrayList<>();
+
             int i = 0;
-            while (!databaseQueue.isEmpty()) {
-                MeterData meterData = databaseQueue.removeFirst();
+            while (!localDatabaseQueue.isEmpty()) {
+                MeterData meterData = localDatabaseQueue.removeFirst();
 
                 statement.setLong(1, meterData.id);
                 statement.setLong(2, meterData.count);
