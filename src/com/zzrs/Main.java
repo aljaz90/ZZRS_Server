@@ -141,6 +141,9 @@ public class Main {
         @Override
         public void handle(HttpExchange t) {
             try {
+                Calendar calendar = Calendar.getInstance();
+                long millisecondsFromMidnight = calendar.getTimeInMillis() - midnight.getTimeInMillis();
+
                 InputStreamReader isr = new InputStreamReader(t.getRequestBody(), StandardCharsets.UTF_8);
                 BufferedReader br = new BufferedReader(isr);
 
@@ -168,9 +171,6 @@ public class Main {
                     long count = Long.parseLong(body.get("count"));
                     double value = Double.parseDouble(body.get("value"));
                     long clientTimestamp = Long.parseLong(body.get("timestamp"));
-
-                    Calendar calendar = Calendar.getInstance();
-                    long millisecondsFromMidnight = calendar.getTimeInMillis() - midnight.getTimeInMillis();
 
                     long travelTime = Math.abs(millisecondsFromMidnight - clientTimestamp);
                     MeterData meterData = new MeterData(id, count, value, travelTime);
