@@ -42,6 +42,9 @@ public class Main {
     private static final int writeToDatabaseEvery = 20;
     private static final int writeToLogEvery = 20;
 
+    private static int numberOfDatabaseInserts = 0;
+    private static long totalTimeTaken = 0;
+
     public static void main(String[] args) {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
@@ -54,6 +57,12 @@ public class Main {
             server.createContext("/report", new ZZRSHandler());
             server.setExecutor(null);
             server.start();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("Total number of INSERTs: " + numberOfDatabaseInserts);
+                System.out.println("Total amount of time taken (ms): " + totalTimeTaken);
+            }));
+
         } catch (Exception exception) {
             throw new RuntimeException(exception);
         }
@@ -88,9 +97,11 @@ public class Main {
 
     private static void saveToDatabase() {
         try {
+            long start = System.currentTimeMillis();
             PreparedStatement statement = sqlConnection.prepareStatement("INSERT INTO MeterData (id, count, value, travelTime) VALUES (?, ?, ?, ?)");
 
             List<MeterData> localDatabaseQueue = databaseQueue;
+            numberOfDatabaseInserts += localDatabaseQueue.size();
             databaseQueue = new ArrayList<>();
 
             int i = 0;
@@ -111,6 +122,9 @@ public class Main {
             }
 
             statement.executeBatch();
+            long finish = System.currentTimeMillis();
+            long timeElapsed = finish - start;
+            totalTimeTaken += timeElapsed;
         } catch (SQLException exception) {
             exception.printStackTrace();
         }
